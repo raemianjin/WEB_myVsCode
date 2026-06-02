@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<title>MyVscode for iPad</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<style>
+:root{
+  --fs: 17px;            /* GLOBAL font size knob - everything scales from this */
+  --bg:#181818; --bg2:#1f1f1f; --bg3:#2a2a2c; --bg4:#323236; --line:#333338;
+  --fg:#e4e4e7; --fg2:#8a8a92; --accent:#5b8cff; --accent2:#7dd3c0;
+  --accent-grad1:#6366f1; --accent-grad2:#8b5cf6;
+  --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
+  --mono:'Roboto Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:system-ui,Roboto,sans-serif;font-size:var(--fs)}
+button{font-family:inherit;font-size:.85em;color:var(--fg);background:var(--bg3);
+  border:1px solid var(--line);border-radius:9px;padding:.5em .8em;cursor:pointer;
+  transition:background .12s,border-color .12s,transform .05s}
+button:hover{background:var(--bg4);border-color:#444}
+button:active{transform:scale(.96)}
+.btn-primary{background:linear-gradient(135deg,var(--accent-grad1),var(--accent-grad2))!important;
+  border:none!important;color:#fff!important;font-weight:600}
+.btn-run{background:linear-gradient(135deg,#16a34a,#15803d)!important;border:none!important;color:#fff!important;font-weight:600}
+.btn-save{background:linear-gradient(135deg,#3b82f6,#2563eb)!important;border:none!important;color:#fff!important}
+.btn-stop{background:linear-gradient(135deg,#ef4444,#dc2626)!important;border:none!important;color:#fff!important}
+.row{display:flex;align-items:center;gap:.4em}
+.grow{flex:1}
+.hidden{display:none!important}
+
+/* ---------- top bar ---------- */
+#top{display:flex;align-items:center;gap:.4em;padding:.4em .5em;background:var(--bg2);
+  border-bottom:1px solid var(--line);flex-wrap:nowrap}
+#top .brand{color:var(--accent2);font-weight:700;font-size:.95em;white-space:nowrap}
+#tabs{display:flex;gap:.3em;flex:1;overflow-x:auto;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:.3em;padding:.35em .6em;background:var(--bg3);
+  border:1px solid var(--line);border-radius:8px 8px 0 0;white-space:nowrap;font-size:.8em}
+.tab.active{background:var(--bg);border-bottom-color:var(--bg);color:#fff}
+.tab .x{color:var(--fg2);font-weight:700;padding:0 .2em}
+
+/* ---------- font size control (always visible) ---------- */
+#fontctl{display:flex;align-items:center;gap:.25em;background:var(--bg3);
+  border:1px solid var(--line);border-radius:10px;padding:.15em .25em}
+#fontctl button{padding:.25em .55em;font-size:1.1em;font-weight:700;border:none;background:transparent}
+#fontctl .val{min-width:2.2em;text-align:center;font-size:.85em;color:var(--accent2);font-weight:700}
+
+/* ---------- view switch ---------- */
+#views{display:flex;background:var(--bg2);border-bottom:1px solid var(--line)}
+#views .vbtn{flex:1;text-align:center;padding:.6em;border:none;border-radius:0;
+  background:transparent;border-bottom:2px solid transparent;font-size:.85em}
+#views .vbtn.active{color:#fff;border-bottom-color:var(--accent2);background:var(--bg)}
+
+/* ---------- panels ---------- */
+#stage{position:relative;flex:1;overflow:hidden}
+.panel{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
+.panel.hidden{display:none}
+
+/* editor */
+#editorWrap{flex:1;display:flex;overflow:hidden;background:var(--bg)}
+#gutter{padding:.6em .4em;color:var(--fg2);font-family:var(--mono);font-size:var(--fs);
+  text-align:right;background:var(--bg2);user-select:none;white-space:pre;line-height:1.45;overflow:hidden;min-width:2.4em}
+#code{flex:1;border:none;outline:none;resize:none;background:var(--bg);color:var(--fg);
+  font-family:var(--mono);font-size:var(--fs);line-height:1.45;padding:.6em .6em;
+  white-space:pre;overflow:auto;tab-size:4}
+#code.wrap{white-space:pre-wrap}
+.CodeMirror{height:100%!important;width:100%!important;font-family:var(--mono)!important}
+.CodeMirror-scroll{min-height:100%}
+#editorBtns{display:flex;gap:.35em;padding:.4em;background:var(--bg2);border-top:1px solid var(--line);
+  overflow-x:auto;scrollbar-width:none}
+#editorBtns::-webkit-scrollbar{display:none}
+#editorBtns button{white-space:nowrap;font-size:.8em}
+.btn-run{background:#234d23!important;border-color:#2f662f!important}
+.btn-save{background:#26406a!important}
+
+/* console */
+#console{flex:1;overflow:auto;padding:.6em;font-family:var(--mono);font-size:.9em;
+  white-space:pre-wrap;line-height:1.4;background:#141414}
+.cl-sys{color:var(--accent2)} .cl-err{color:var(--bad)} .cl-ok{color:var(--ok)}
+
+/* inline AI (replaces console temporarily) */
+#inlineAI{position:absolute;left:0;right:0;bottom:0;height:45%;display:flex;flex-direction:column;
+  background:var(--bg2);border-top:2px solid var(--accent);z-index:5}
+#inlineAIHead{display:flex;align-items:center;justify-content:space-between;padding:.5em .7em;
+  background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));
+  border-bottom:1px solid var(--line);font-size:.85em;font-weight:600}
+#inlineAIHead .closebtn{background:transparent;border:none;color:var(--fg2);font-size:1.1em;padding:.2em .5em}
+#inlineChatLog{flex:1;overflow:auto;padding:.6em;display:flex;flex-direction:column;gap:.5em}
+#inlineInputRow{display:flex;gap:.4em;padding:.5em;border-top:1px solid var(--line);align-items:flex-end}
+#inlineInput{flex:1;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:10px;
+  padding:.6em;font-size:.9em;font-family:inherit;resize:none;max-height:25vh;min-height:2.4em}
+
+/* ---------- AI chat ---------- */
+#chatLog{flex:1;overflow:auto;padding:.6em;display:flex;flex-direction:column;gap:.6em}
+.msg{max-width:92%;padding:.6em .8em;border-radius:14px;font-size:.92em;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--accent-grad1),var(--accent-grad2));color:#fff;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--bg3);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg .who{font-size:.72em;color:var(--accent2);margin-bottom:.3em;font-family:var(--mono)}
+.msg pre{background:#141414;border:1px solid var(--line);border-radius:8px;padding:.6em;overflow:auto;margin:.4em 0}
+.msg code{font-family:var(--mono);font-size:.9em}
+.msg .codebar{display:flex;justify-content:flex-end;gap:.3em;margin-top:.2em}
+.msg .codebar button{font-size:.7em;padding:.25em .5em}
+.typing{color:var(--fg2);font-style:italic}
+#chatInputRow{display:flex;gap:.4em;padding:.5em;background:var(--bg2);border-top:1px solid var(--line);align-items:flex-end}
+#chatInput{flex:1;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:10px;
+  padding:.6em;font-size:.92em;font-family:inherit;resize:none;max-height:30vh;min-height:2.6em}
+#sendBtn{background:var(--accent);border-color:var(--accent);font-weight:700;padding:.7em 1em}
+#aiPicker{display:flex;gap:.4em;padding:.4em .5em;background:var(--bg2);border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap}
+#aiPicker select{flex:1;min-width:8em;background:var(--bg3);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:.45em;font-size:.85em}
+.aibadge{font-size:.7em;color:var(--fg2)}
+
+/* ---------- settings ---------- */
+#settings{flex:1;overflow:auto;padding:.6em}
+.sect{color:var(--accent2);font-size:.78em;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;margin:1em .2em .4em;border-bottom:1px solid var(--line);padding-bottom:.3em}
+.srow{display:flex;align-items:center;gap:.6em;padding:.6em .3em;border-bottom:1px solid var(--bg3)}
+.srow label{flex:1;font-size:.9em}
+.srow input[type=text],.srow input[type=password],.srow select{
+  flex:1.4;min-width:0;background:var(--bg);color:var(--fg);border:1px solid var(--line);
+  border-radius:8px;padding:.5em;font-size:.82em;font-family:var(--mono)}
+/* clean CSS toggle (never breaks like native) */
+.toggle{position:relative;width:3.2em;height:1.7em;flex:0 0 auto}
+.toggle input{display:none}
+.toggle .track{position:absolute;inset:0;background:#555;border-radius:1em;transition:.2s}
+.toggle .knob{position:absolute;top:.15em;left:.15em;width:1.4em;height:1.4em;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.track{background:var(--accent2)}
+.toggle input:checked+.track+.knob{left:1.65em}
+.keyrow{display:flex;flex-direction:column;gap:.3em;padding:.6em .3em;border-bottom:1px solid var(--bg3)}
+.keyrow .top{display:flex;align-items:center;gap:.5em}
+.keyrow .pname{flex:1;font-size:.88em;font-weight:600}
+.keyrow .lim{font-size:.7em;color:var(--fg2)}
+.keyrow a{color:var(--accent);font-size:.72em;text-decoration:none}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:1em;transform:translateX(-50%);z-index:99;
+  display:flex;flex-direction:column;gap:.4em;align-items:center;pointer-events:none}
+.tmsg{background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:.6em 1em;
+  font-size:.85em;max-width:90vw;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.tmsg.bad{border-color:var(--bad)} .tmsg.ok{border-color:var(--ok)} .tmsg.warn{border-color:var(--warn)}
+
+#statusbar{display:flex;gap:.8em;padding:.35em .6em;background:var(--accent);color:#fff;font-size:.72em}
+
+/* custom input modal */
+#modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.6)}
+#modal.hidden{display:none}
+.modalBox{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:1.1em;
+  width:86vw;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+.modalTitle{font-size:.95em;font-weight:600;margin-bottom:.7em;color:var(--fg)}
+#modalInput{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);
+  border-radius:9px;padding:.7em;font-size:.95em;font-family:var(--mono)}
+.modalBtns{display:flex;gap:.5em;justify-content:flex-end;margin-top:1em}
+.modalBtns button{padding:.6em 1.1em}
+
+/* diff review modal */
+#diffModal{position:fixed;inset:0;z-index:210;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.7)}
+#diffModal.hidden{display:none}
+.diffBox{background:var(--bg2);border:1px solid var(--line);border-radius:14px;
+  width:94vw;max-width:560px;height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.7)}
+.diffHead{display:flex;align-items:center;justify-content:space-between;padding:.8em 1em;
+  border-bottom:1px solid var(--line);font-weight:600}
+.diffHead .closebtn{background:transparent;border:none;color:var(--fg2);font-size:1.1em}
+#diffBody{flex:1;overflow:auto;padding:.6em;font-family:var(--mono);font-size:.82em;line-height:1.45}
+#diffBody .dl{white-space:pre-wrap;word-break:break-word;padding:0 .4em;border-radius:3px}
+#diffBody .add{background:rgba(74,222,128,.16);color:#86efac}
+#diffBody .del{background:rgba(248,113,113,.16);color:#fca5a5;text-decoration:none}
+#diffBody .ctx{color:var(--fg2)}
+.diffBtns{display:flex;gap:.5em;justify-content:flex-end;padding:.8em 1em;border-top:1px solid var(--line)}
+.diffBtns button{padding:.6em 1.2em}
+
+/* file browser */
+#fileModal{position:fixed;inset:0;z-index:205;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.7)}
+#fileModal.hidden{display:none}
+#fileList{flex:1;overflow:auto;padding:.4em}
+.fitem{display:flex;align-items:center;justify-content:space-between;padding:.7em .8em;
+  border-radius:9px;cursor:pointer;border:1px solid transparent}
+.fitem:hover,.fitem:active{background:var(--bg3);border-color:var(--line)}
+.fitem .fn{font-family:var(--mono);font-size:.9em}
+.fitem .fsz{font-size:.72em;color:var(--fg2)}
+.fitem .ext{font-size:.7em;color:var(--accent2);margin-right:.5em}
+#fileList .empty{color:var(--fg2);text-align:center;padding:2em;font-size:.85em}
+</style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;height:100%">
+
+  <!-- TOP BAR -->
+  <div id="top">
+    <span class="brand">MyVscode</span>
+    <div id="tabs"></div>
+    <div id="fontctl">
+      <button onclick="changeFont(-1)">A−</button>
+      <span class="val" id="fontVal">17</span>
+      <button onclick="changeFont(1)">A+</button>
+    </div>
+  </div>
+
+  <!-- VIEW SWITCH -->
+  <div id="views">
+    <button class="vbtn active" data-v="editor" onclick="switchView('editor')">Editor</button>
+    <button class="vbtn" data-v="ai" onclick="switchView('ai')">AI</button>
+    <button class="vbtn" data-v="settings" onclick="switchView('settings')">Settings</button>
+  </div>
+
+  <!-- STAGE -->
+  <div id="stage">
+
+    <!-- EDITOR PANEL -->
+    <div class="panel" id="p-editor">
+      <div id="editorWrap">
+        <div id="gutter">1</div>
+        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
+          oninput="onCode()" onscroll="syncGutter()" onkeyup="updateCursor()" onclick="updateCursor()"></textarea>
+      </div>
+      <div id="editorBtns">
+        <button class="btn-run" onclick="runCode()">Run</button>
+        <button class="btn-stop" onclick="stopCode()">Stop</button>
+        <button class="btn-primary" onclick="toggleInlineAI()">AI</button>
+        <button class="btn-primary" onclick="aiFixCode()">AI수정</button>
+        <button onclick="clearConsole()">Clear</button>
+        <button onclick="newFile()">New</button>
+        <button class="btn-save" onclick="saveFile()">Save</button>
+        <button onclick="openFile()">열기</button>
+        <button onclick="downloadFromPyFS()">결과파일</button>
+        <button onclick="formatCode()">정렬</button>
+        <button onclick="copyAll()">전체복사</button>
+        <button id="wrapBtn" onclick="toggleWrap()">Wrap: OFF</button>
+      </div>
+      <!-- inline AI chat that temporarily replaces the console -->
+      <div id="inlineAI" class="hidden">
+        <div id="inlineAIHead">
+          <span>AI 어시스턴트 <span class="aibadge" id="inlineAIProv"></span></span>
+          <button onclick="closeInlineAI()" class="closebtn">✕</button>
+        </div>
+        <div id="inlineChatLog"></div>
+        <div id="inlineInputRow">
+          <textarea id="inlineInput" rows="1" placeholder="코드에 대해 질문하세요…" oninput="autoGrow(this)"></textarea>
+          <button id="inlineSendBtn" class="btn-primary" onclick="sendInlineChat()">전송</button>
+          <button id="inlineStopBtn" class="btn-stop hidden" onclick="abortChat()">■</button>
+        </div>
+      </div>
+      <div id="console" style="max-height:35%"></div>
+    </div>
+
+    <!-- AI PANEL -->
+    <div class="panel hidden" id="p-ai">
+      <div id="aiPicker">
+        <label class="row" style="gap:.3em;font-size:.8em">
+          <input type="checkbox" id="autoMode" onchange="toggleAuto()"> 자동
+        </label>
+        <select id="provSelect" onchange="onProvChange()"></select>
+        <select id="modelSelect" onchange="onModelChange()"></select>
+      </div>
+      <div id="chatLog"></div>
+      <div id="chatInputRow">
+        <button id="getCodeBtn" onclick="insertEditorToChat()" title="에디터 코드 첨부">코드↡</button>
+        <textarea id="chatInput" rows="1" placeholder="무엇이든 물어보세요…"
+          oninput="autoGrow(this)"></textarea>
+        <button id="sendBtn" class="btn-primary" onclick="sendChat()">전송</button>
+        <button id="chatStopBtn" class="btn-stop hidden" onclick="abortChat()">■</button>
+      </div>
+    </div>
+
+    <!-- SETTINGS PANEL -->
+    <div class="panel hidden" id="p-settings">
+      <div id="settings"></div>
+    </div>
+
+  </div>
+
+  <div id="statusbar">
+    <span id="sb-mode">Editor</span>
+    <span id="sb-pos">Ln 1, Col 1</span>
+    <span class="grow"></span>
+    <span id="sb-ai">AI: -</span>
+  </div>
+</div>
+
+<!-- diff review modal: AI code changes shown before applying -->
+<div id="diffModal" class="hidden">
+  <div class="diffBox">
+    <div class="diffHead">
+      <span id="diffTitle">변경 사항 검토</span>
+      <button class="closebtn" onclick="diffCancel()">✕</button>
+    </div>
+    <div id="diffBody"></div>
+    <div class="diffBtns">
+      <button onclick="diffCancel()">거절</button>
+      <button class="btn-primary" onclick="diffAccept()">수락 (적용)</button>
+    </div>
+  </div>
+</div>
+
+<!-- file browser modal -->
+<div id="fileModal" class="hidden">
+  <div class="diffBox">
+    <div class="diffHead">
+      <span id="fileModalTitle">파일 열기</span>
+      <button class="closebtn" onclick="closeFileBrowser()">✕</button>
+    </div>
+    <div id="fileList"></div>
+    <div class="diffBtns">
+      <button onclick="refreshFileList()">새로고침</button>
+      <button onclick="closeFileBrowser()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- custom input modal (Android WebView blocks window.prompt) -->
+<div id="modal" class="hidden">
+  <div class="modalBox">
+    <div class="modalTitle" id="modalTitle">입력</div>
+    <input type="text" id="modalInput" autocomplete="off">
+    <div class="modalBtns">
+      <button onclick="modalCancel()">취소</button>
+      <button class="btn-primary" onclick="modalOk()">확인</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script>
+/* ============================================================
+   MyVscode for iPad / browser — Pyodide runtime + browser files
+   (replaces the Android native bridge)
+   ============================================================ */
+
+/* ---------- Pyodide (in-browser Python) ---------- */
+let _pyodide = null, _pyLoading = false, _pyReady = false;
+async function ensurePyodide(){
+  if(_pyReady) return _pyodide;
+  if(_pyLoading){ // wait until ready
+    while(!_pyReady) await new Promise(r=>setTimeout(r,150));
+    return _pyodide;
+  }
+  _pyLoading = true;
+  log('sys','Python 런타임(Pyodide) 로딩 중… 처음 한 번만 시간이 걸립니다.');
+  try{
+    _pyodide = await loadPyodide({
+      stdout:(s)=>log('ok', s),
+      stderr:(s)=>log('err', s),
+    });
+    // route Python input() to the browser prompt dialog
+    try{
+      _pyodide.setStdin({ stdin: ()=>{ const v=window.prompt('input():'); return v===null?'':v; } });
+    }catch(e){ /* older pyodide: ignore */ }
+    _pyReady = true;
+    log('ok','Python 준비 완료.');
+  }catch(e){
+    log('err','Pyodide 로딩 실패: '+e);
+    toast('bad','Python 로딩 실패','인터넷 연결을 확인하세요.');
+  }
+  _pyLoading = false;
+  return _pyodide;
+}
+// load common packages on demand (numpy/pandas) if imported
+async function maybeLoadPackages(code){
+  try{
+    const pkgs=[];
+    if(/\bimport\s+numpy|\bfrom\s+numpy/.test(code)) pkgs.push('numpy');
+    if(/\bimport\s+pandas|\bfrom\s+pandas/.test(code)) pkgs.push('pandas');
+    if(pkgs.length){
+      log('sys','패키지 로딩: '+pkgs.join(', '));
+      await _pyodide.loadPackage(pkgs);
+    }
+  }catch(e){ log('err','패키지 로딩 오류: '+e); }
+}
+
+let _running=false;
+async function runCode(){
+  closeInlineAI();
+  if(_running){ toast('warn','실행 중','이미 실행 중입니다.'); return; }
+  files[activeFile]=getCode(); persistFiles();
+  log('sys','▶ 실행: '+activeFile);
+  _running=true;
+  try{
+    await ensurePyodide();
+    if(!_pyReady){ _running=false; return; }
+    const code=getCode();
+    await maybeLoadPackages(code);
+    // capture stdout/stderr already wired in loadPyodide; run async
+    await _pyodide.runPythonAsync(code);
+    log('ok','\n실행 완료');
+  }catch(e){
+    log('err', String(e.message||e));
+    log('err','오류로 종료됨');
+  }
+  _running=false;
+}
+function debugCode(){ runCode(); }   // browser: same as run (no settrace UI)
+function stopCode(){
+  // Pyodide runs synchronously in the main thread; hard stop isn't available.
+  toast('warn','중지','브라우저 버전은 실행 중 강제 중지를 지원하지 않습니다.');
+}
+
+/* ---------- browser file save / open ---------- */
+// In the browser there is no fixed work folder. We keep files in memory and
+// let the user download/upload. Optional File System Access API on desktop.
+function hasNative(){ return false; }
+function scheduleAutoSave(){ /* localStorage autosave handled in onCode */ }
+
+function saveFile(){
+  files[activeFile]=getCode(); persistFiles();
+  // download the active file
+  downloadText(activeFile, getCode());
+  toast('ok','저장(다운로드)', activeFile);
+}
+function downloadText(name, text){
+  const blob=new Blob([text], {type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name; document.body.appendChild(a);
+  a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function openFile(){
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept='.py,.txt,.json,.md,.csv,.js,.html,.css';
+  inp.onchange=()=>{
+    const f=inp.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{
+      files[f.name]=r.result; switchFile(f.name); setCode(r.result);
+      toast('ok','열기 완료', f.name);
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function refreshFileList(){}
+function closeFileBrowser(){ const m=document.getElementById('fileModal'); if(m) m.classList.add('hidden'); }
+// folder concept doesn't exist in the browser; map "폴더" button to a hint
+function chooseDir(){
+  toast('sys','폴더','브라우저 버전은 저장 시 파일을 다운로드합니다. 폴더 지정은 기기 앱에서 지원됩니다.');
+}
+
+/* download any file produced by Python (e.g. CSV written to Pyodide FS) */
+async function downloadFromPyFS(){
+  if(!_pyReady){ toast('warn','없음','먼저 코드를 실행하세요.'); return; }
+  try{
+    const FS=_pyodide.FS;
+    const names=FS.readdir('.').filter(n=>n!=='.'&&n!=='..');
+    if(!names.length){ toast('sys','파일 없음','파이썬이 만든 파일이 없습니다.'); return; }
+    showPyFiles(names);
+  }catch(e){ toast('bad','오류', String(e)); }
+}
+function showPyFiles(names){
+  const list=document.getElementById('fileList'); list.innerHTML='';
+  document.getElementById('fileModalTitle').textContent='파이썬이 만든 파일 (탭하면 다운로드)';
+  names.forEach(n=>{
+    const it=document.createElement('div'); it.className='fitem';
+    it.innerHTML='<span class="fn">'+esc(n)+'</span><span class="fsz">다운로드</span>';
+    it.onclick=()=>{
+      try{
+        const data=_pyodide.FS.readFile(n);
+        const blob=new Blob([data]);
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download=n;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+        toast('ok','다운로드', n);
+      }catch(e){ toast('bad','실패', String(e)); }
+    };
+    list.appendChild(it);
+  });
+  document.getElementById('fileModal').classList.remove('hidden');
+}
+
+let workdir='';   // unused in browser but referenced by some code
+/* ============================================================
+   MyVscode WebView app — editor + console + 10 free AI providers
+   ============================================================ */
+
+/* ---------- runtime note ----------
+   This iPad/browser build runs Python via Pyodide (WebAssembly) instead of a
+   native bridge. File save = download, open = upload. AI providers use fetch. */
+
+// Receive app-log lines pushed from Python and show in console
+
+// debounced auto-save to native file storage
+let _autoSaveTimer=null;
+
+/* ---------- persistent store ---------- */
+const LS = { cfg:'mvs.cfg.v1', files:'mvs.files.v1', glob:'mvs.glob.v1' };
+function load(k,d){ try{ return JSON.parse(localStorage.getItem(k))||d }catch(e){ return d } }
+function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch(e){} }
+
+let glob = load(LS.glob, { fontSize:17, wrap:false, autoMode:false,
+                           currentProv:'gemini', currentModel:null });
+
+/* ============================================================
+   GLOBAL FONT SCALING  — the headline feature
+   One CSS variable scales the WHOLE UI (editor, chat, buttons).
+   ============================================================ */
+function applyFont(){
+  document.documentElement.style.setProperty('--fs', glob.fontSize + 'px');
+  const v = document.getElementById('fontVal'); if(v) v.textContent = glob.fontSize;
+  if(cmEditor) applyFontCM(); else syncGutter();
+  save(LS.glob, glob);
+}
+function changeFont(delta){
+  glob.fontSize = Math.max(11, Math.min(40, glob.fontSize + delta*1));
+  applyFont();
+}
+// Pinch-to-zoom on the editor also changes font (magnifier behaviour)
+let _pinchStart=null;
+function setupPinch(){
+  const code=document.getElementById('code');
+  code.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      _pinchStart={d:dist(e.touches),fs:glob.fontSize};
+    }
+  },{passive:true});
+  code.addEventListener('touchmove',e=>{
+    if(e.touches.length===2 && _pinchStart){
+      const ratio=dist(e.touches)/_pinchStart.d;
+      glob.fontSize=Math.max(11,Math.min(40,Math.round(_pinchStart.fs*ratio)));
+      applyFont();
+    }
+  },{passive:true});
+  code.addEventListener('touchend',()=>{_pinchStart=null;});
+}
+function dist(t){const dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.hypot(dx,dy);}
+
+/* ============================================================
+   EDITOR
+   ============================================================ */
+let files = load(LS.files, null) || {
+  'untitled_1.py': '# MyVscode - Python Editor\n# Version 2.0\n\nprint("Hello, World!")\n'
+};
+let activeFile = Object.keys(files)[0];
+
+const codeEl = ()=>document.getElementById('code');
+const gutterEl = ()=>document.getElementById('gutter');
+const consoleEl = ()=>document.getElementById('console');
+
+/* ---------- CodeMirror integration ----------
+   If CodeMirror loaded, upgrade the <textarea> into a real code editor with
+   syntax highlighting, auto-indent and bracket matching. All editor access
+   goes through getCode()/setCode()/onEditorChange so the rest of the app
+   works whether or not CodeMirror is present. */
+let cmEditor = null;
+function initEditor(){
+  const ta = codeEl();
+  if(typeof CodeMirror === 'undefined'){ return; } // fallback: plain textarea
+  cmEditor = CodeMirror.fromTextArea(ta, {
+    mode: 'python',
+    theme: 'material-darker',
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    styleActiveLine: true,
+    lineWrapping: glob.wrap
+  });
+  // hide the old separate gutter; CodeMirror draws its own line numbers
+  const g = gutterEl(); if(g) g.style.display='none';
+  cmEditor.setSize('100%','100%');
+  cmEditor.on('change', ()=>{ onCode(); });
+  cmEditor.on('cursorActivity', ()=>{ updateCursorCM(); });
+  applyFontCM();
+}
+function getCode(){ return cmEditor ? cmEditor.getValue() : codeEl().value; }
+function setCode(v){ if(cmEditor) cmEditor.setValue(v||''); else codeEl().value=v||''; }
+function applyFontCM(){
+  if(cmEditor){
+    const wrap=cmEditor.getWrapperElement();
+    wrap.style.fontSize=glob.fontSize+'px';
+    cmEditor.refresh();
+  }
+}
+function updateCursorCM(){
+  if(!cmEditor) return;
+  const c=cmEditor.getCursor();
+  document.getElementById('sb-pos').textContent=`Ln ${c.line+1}, Col ${c.ch+1}`;
+}
+
+function renderTabs(){
+  const t=document.getElementById('tabs'); t.innerHTML='';
+  Object.keys(files).forEach(name=>{
+    const d=document.createElement('div');
+    d.className='tab'+(name===activeFile?' active':'');
+    const safe=esc(name);
+    d.innerHTML=`<span onclick="onTabClick('${safe}')" ondblclick="renameFile('${safe}')">${safe}</span>`+
+                `<span class="x" onclick="closeFile('${safe}')">×</span>`;
+    t.appendChild(d);
+  });
+}
+function onTabClick(name){
+  // tapping the active tab lets you rename; tapping another switches to it
+  if(name===activeFile) renameFile(name);
+  else switchFile(name);
+}
+function renameFile(oldName){
+  askInput('파일 이름 변경', oldName).then(nn=>{
+    if(!nn || nn===oldName) return;
+    nn=nn.trim(); if(!nn) return;
+    if(files[nn]){ toast('bad','이름 중복', nn+' 이미 존재'); return; }
+    const newFiles={};
+    Object.keys(files).forEach(k=>{ newFiles[k===oldName?nn:k]=files[k]; });
+    files=newFiles;
+    if(activeFile===oldName) activeFile=nn;
+    renderTabs(); persistFiles();
+    toast('ok','이름 변경', oldName+' → '+nn);
+  });
+}
+function switchFile(name){
+  files[activeFile]=getCode();
+  activeFile=name; setCode(files[name]||'');
+  renderTabs(); syncGutter(); updateCursor(); persistFiles();
+}
+function closeFile(name){
+  const keys=Object.keys(files);
+  if(keys.length<=1){ toast('warn','마지막 파일','최소 1개 파일은 유지됩니다.'); return; }
+  delete files[name];
+  if(activeFile===name) activeFile=Object.keys(files)[0];
+  setCode(files[activeFile]); renderTabs(); syncGutter(); persistFiles();
+}
+function newFile(){
+  let i=1; while(files['untitled_'+i+'.py']) i++;
+  const name='untitled_'+i+'.py';
+  files[name]='# new file\n'; switchFile(name);
+  toast('ok','새 파일',name);
+}
+function onCode(){ files[activeFile]=getCode(); syncGutter(); persistFiles(); scheduleAutoSave(); }
+function persistFiles(){ save(LS.files, files); }
+
+function syncGutter(){
+  if(cmEditor) return;  // CodeMirror draws its own gutter
+  const code=codeEl(), g=gutterEl(); if(!code||!g) return;
+  const lines=code.value.split('\n').length;
+  let s=''; for(let i=1;i<=lines;i++) s+=i+'\n';
+  g.textContent=s;
+  g.scrollTop=code.scrollTop;
+}
+function updateCursor(){
+  if(cmEditor){ updateCursorCM(); return; }
+  const code=codeEl(); const pos=code.selectionStart;
+  const before=code.value.slice(0,pos);
+  const ln=before.split('\n').length;
+  const col=pos-before.lastIndexOf('\n');
+  document.getElementById('sb-pos').textContent=`Ln ${ln}, Col ${col}`;
+}
+function toggleWrap(){
+  glob.wrap=!glob.wrap;
+  if(cmEditor) cmEditor.setOption('lineWrapping', glob.wrap);
+  else codeEl().classList.toggle('wrap',glob.wrap);
+  const b=document.getElementById('wrapBtn'); if(b) b.textContent='Wrap: '+(glob.wrap?'ON':'OFF');
+  save(LS.glob,glob);
+  syncGutter();
+  toast('ok','자동 줄바꿈', glob.wrap?'켜짐':'꺼짐');
+}
+function formatCode(){
+  let src=getCode();
+  const lines=src.replace(/\t/g,'    ')        // tabs -> 4 spaces
+                 .split('\n')
+                 .map(l=>l.replace(/[ \t]+$/,''));  // strip trailing ws
+  // collapse 3+ blank lines into 1
+  const out=[]; let blank=0;
+  for(const l of lines){
+    if(l.trim()===''){ blank++; if(blank<=1) out.push(''); }
+    else { blank=0; out.push(l); }
+  }
+  // remove leading/trailing blank lines, ensure single trailing newline
+  while(out.length && out[0]==='') out.shift();
+  while(out.length && out[out.length-1]==='') out.pop();
+  const formatted=out.join('\n')+'\n';
+  _undoBackup=getCode();
+  setCode(formatted); onCode();
+  toast('ok','정렬 완료','탭→공백·후행공백·빈줄을 정리했습니다.');
+}
+function copyAll(){
+  const text=getCode();
+  const done=()=>toast('ok','복사됨','에디터 전체 내용을 클립보드에 복사했습니다.');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text,done));
+  }else fallbackCopy(text,done);
+}
+function fallbackCopy(text, done){
+  const ta=document.createElement('textarea'); ta.value=text;
+  ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ toast('bad','복사 실패','클립보드 접근이 거부되었습니다.'); }
+  ta.remove();
+}
+
+/* Tab key inserts spaces */
+function setupEditorKeys(){
+  codeEl().addEventListener('keydown',e=>{
+    if(e.key==='Tab'){ e.preventDefault();
+      const c=codeEl(), s=c.selectionStart, en=c.selectionEnd;
+      c.value=c.value.slice(0,s)+'    '+c.value.slice(en);
+      c.selectionStart=c.selectionEnd=s+4; onCode();
+    }
+  });
+}
+
+/* ---------- file save / open via native bridge ---------- */
+// Python returns the file list -> show a picker
+
+/* ---------- working directory ---------- */
+/* custom input modal (replaces window.prompt, which Android WebView blocks) */
+let _modalResolve=null;
+function askInput(title, defaultVal){
+  return new Promise(resolve=>{
+    _modalResolve=resolve;
+    document.getElementById('modalTitle').textContent=title;
+    const inp=document.getElementById('modalInput');
+    inp.value=defaultVal||'';
+    document.getElementById('modal').classList.remove('hidden');
+    setTimeout(()=>{ inp.focus(); inp.select(); },50);
+  });
+}
+function modalOk(){
+  const v=document.getElementById('modalInput').value;
+  document.getElementById('modal').classList.add('hidden');
+  if(_modalResolve){ _modalResolve(v); _modalResolve=null; }
+}
+function modalCancel(){
+  document.getElementById('modal').classList.add('hidden');
+  if(_modalResolve){ _modalResolve(null); _modalResolve=null; }
+}
+
+let _browsePath='';
+
+/* ============================================================
+   CONSOLE  (Run executes via native python bridge)
+   ============================================================ */
+const MAX_LOG_LINES = 1000;
+function log(kind, text){
+  const c=consoleEl(); const span=document.createElement('div');
+  span.className='cl-'+(kind||'sys'); span.textContent=text; c.appendChild(span);
+  // keep only the most recent MAX_LOG_LINES entries
+  while(c.childNodes.length > MAX_LOG_LINES){ c.removeChild(c.firstChild); }
+  c.scrollTop=c.scrollHeight;
+}
+function clearConsole(){ consoleEl().innerHTML=''; }
+// native streams output here
+
+/* ============================================================
+   AI PROVIDERS  (ported from ai-console reference, 10 free APIs)
+   ============================================================ */
+const PROVIDERS = [
+  { id:"gemini", name:"Google Gemini", keyUrl:"https://aistudio.google.com/apikey",
+    kind:"gemini", vision:true,
+    models:[{id:"gemini-2.5-flash"},{id:"gemini-2.5-flash-lite"},{id:"gemini-2.0-flash"}] },
+  { id:"groq", name:"Groq", keyUrl:"https://console.groq.com/keys",
+    kind:"openai", vision:true, base:"https://api.groq.com/openai/v1/chat/completions",
+    models:[{id:"llama-3.3-70b-versatile"},{id:"llama-3.1-8b-instant"},{id:"openai/gpt-oss-120b"}] },
+  { id:"cerebras", name:"Cerebras", keyUrl:"https://cloud.cerebras.ai",
+    kind:"openai", base:"https://api.cerebras.ai/v1/chat/completions",
+    models:[{id:"gpt-oss-120b"},{id:"llama3.3-70b"},{id:"llama3.1-8b"},{id:"qwen-3-32b"}] },
+  { id:"openrouter", name:"OpenRouter", keyUrl:"https://openrouter.ai/keys",
+    kind:"openai", vision:true, base:"https://openrouter.ai/api/v1/chat/completions",
+    models:[{id:"deepseek/deepseek-r1:free"},{id:"meta-llama/llama-3.3-70b-instruct:free"},
+            {id:"qwen/qwen3-coder:free"},{id:"google/gemma-3-27b-it:free"}] },
+  { id:"mistral", name:"Mistral AI", keyUrl:"https://console.mistral.ai/api-keys",
+    kind:"openai", base:"https://api.mistral.ai/v1/chat/completions",
+    models:[{id:"mistral-small-latest"},{id:"open-mistral-nemo"},{id:"mistral-large-latest"}] },
+  { id:"sambanova", name:"SambaNova", keyUrl:"https://cloud.sambanova.ai/apis",
+    kind:"openai", base:"https://api.sambanova.ai/v1/chat/completions",
+    models:[{id:"Meta-Llama-3.3-70B-Instruct"},{id:"Meta-Llama-3.1-8B-Instruct"},{id:"Qwen2.5-72B-Instruct"}] },
+  { id:"github", name:"GitHub Models", keyUrl:"https://github.com/settings/personal-access-tokens",
+    kind:"openai", vision:true, base:"https://models.github.ai/inference/chat/completions",
+    models:[{id:"openai/gpt-4o-mini"},{id:"openai/gpt-4o"},{id:"meta/Llama-3.3-70B-Instruct"},{id:"mistral-ai/Mistral-Nemo"}] },
+  { id:"cloudflare", name:"Cloudflare Workers AI", keyUrl:"https://dash.cloudflare.com/profile/api-tokens",
+    kind:"cloudflare", needsAccount:true,
+    models:[{id:"@cf/meta/llama-3.1-8b-instruct"},{id:"@cf/mistral/mistral-7b-instruct-v0.1"},
+            {id:"@cf/meta/llama-3.3-70b-instruct-fp8-fast"}] },
+  { id:"huggingface", name:"Hugging Face", keyUrl:"https://huggingface.co/settings/tokens",
+    kind:"openai", base:"https://router.huggingface.co/v1/chat/completions",
+    models:[{id:"meta-llama/Llama-3.1-8B-Instruct"},{id:"Qwen/Qwen2.5-7B-Instruct"},{id:"mistralai/Mistral-7B-Instruct-v0.3"}] },
+  { id:"cohere", name:"Cohere", keyUrl:"https://dashboard.cohere.com/api-keys",
+    kind:"cohere", base:"https://api.cohere.com/v2/chat",
+    models:[{id:"command-r-plus-08-2024"},{id:"command-r-08-2024"},{id:"command-a-03-2025"}] }
+];
+const PROV={}; PROVIDERS.forEach(p=>PROV[p.id]=p);
+
+let cfg = load(LS.cfg, {});
+// Default auto-mode priority (lower = used first). groq first, gemini second.
+const DEFAULT_PRIORITY = {groq:1, gemini:2};
+let _nextPrio = 3;
+PROVIDERS.forEach((p)=>{
+  const dp = DEFAULT_PRIORITY[p.id] !== undefined ? DEFAULT_PRIORITY[p.id] : (_nextPrio++);
+  if(!cfg[p.id]) cfg[p.id]={key:'',account:'',model:p.models[0].id,priority:dp};
+  if(!cfg[p.id].model) cfg[p.id].model=p.models[0].id;
+  if(cfg[p.id].priority===undefined) cfg[p.id].priority=dp; // 0 = disabled in auto
+});
+function saveCfg(){ save(LS.cfg,cfg); }
+// One-time migration: apply new default priorities (groq=1, gemini=2) once.
+if(!localStorage.getItem('mvs.prio.v2')){
+  cfg.groq.priority=1; cfg.gemini.priority=2;
+  saveCfg();
+  try{ localStorage.setItem('mvs.prio.v2','1'); }catch(e){}
+}
+
+let active={pid:glob.currentProv||'gemini', model:glob.currentModel};
+if(!active.model) active.model=PROV[active.pid].models[0].id;
+
+let chat=[];
+
+function buildRequest(pid, model, messages){
+  const p=PROV[pid], c=cfg[pid];
+  if(p.kind==="gemini"){
+    const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.text}]}));
+    return { url:`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(c.key)}`,
+      opts:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents})} };
+  }
+  if(p.kind==="cloudflare"){
+    return { url:`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(c.account)}/ai/run/${model}`,
+      opts:{method:"POST",headers:{"Authorization":"Bearer "+c.key,"Content-Type":"application/json"},
+        body:JSON.stringify({messages:messages.map(m=>({role:m.role,content:m.text}))})} };
+  }
+  if(p.kind==="cohere"){
+    return { url:p.base, opts:{method:"POST",
+      headers:{"Authorization":"Bearer "+c.key,"Content-Type":"application/json"},
+      body:JSON.stringify({model, messages:messages.map(m=>({role:m.role,content:m.text}))})} };
+  }
+  const headers={"Authorization":"Bearer "+c.key,"Content-Type":"application/json"};
+  if(pid==="openrouter"){ headers["HTTP-Referer"]="https://github.com/raemianjin/myvscode"; headers["X-OpenRouter-Title"]="MyVscode"; headers["X-Title"]="MyVscode"; }
+  return { url:p.base, opts:{method:"POST",headers,
+    body:JSON.stringify({model, messages:messages.map(m=>({role:m.role,content:m.text}))})} };
+}
+function parseResponse(pid, data){
+  const p=PROV[pid]; let text="";
+  if(p.kind==="gemini"){
+    const cand=data.candidates&&data.candidates[0];
+    text=(cand&&cand.content&&cand.content.parts||[]).map(x=>x.text||"").join("");
+  }else if(p.kind==="cloudflare"){
+    text=(data.result&&(data.result.response||data.result.text))||"";
+  }else if(p.kind==="cohere"){
+    text=(data.message&&data.message.content&&data.message.content.map(x=>x.text||"").join(""))||"";
+  }else{
+    const ch=data.choices&&data.choices[0];
+    text=(ch&&ch.message&&ch.message.content)||"";
+    if(Array.isArray(text)) text=text.map(x=>x.text||"").join("");
+  }
+  return text;
+}
+function extractError(data){
+  if(!data) return "응답 없음";
+  if(data.error) return typeof data.error==="string"?data.error:(data.error.message||JSON.stringify(data.error));
+  if(data.errors) return JSON.stringify(data.errors);
+  if(data.message&&!data.choices&&!data.candidates) return data.message;
+  return null;
+}
+let _abortCtrl=null;
+async function callProvider(pid, model, messages){
+  const c=cfg[pid], p=PROV[pid];
+  if(!c.key) throw {kind:"nokey", msg:"API 키가 없습니다. 설정에서 입력하세요."};
+  if(p.needsAccount && !c.account) throw {kind:"nokey", msg:"Account ID가 필요합니다(설정)."};
+  const req=buildRequest(pid, model, messages);
+  let res, data;
+  _abortCtrl = new AbortController();
+  req.opts.signal = _abortCtrl.signal;
+  try{ res=await fetch(req.url, req.opts); }
+  catch(e){
+    if(e.name==='AbortError') throw {kind:"abort", msg:"중단됨"};
+    throw {kind:"network", msg:"네트워크 오류: "+e.message};
+  }
+  const txt=await res.text();
+  try{ data=JSON.parse(txt); }catch(e){ data={raw:txt}; }
+  if(!res.ok){ throw {kind:res.status===429?"limit":"http", msg:extractError(data)||("HTTP "+res.status)}; }
+  const text=parseResponse(pid, data);
+  if(!text){ const err=extractError(data); if(err) throw {kind:"http",msg:err}; }
+  return text;
+}
+function abortChat(){
+  if(_abortCtrl){ try{ _abortCtrl.abort(); }catch(e){} }
+}
+
+/* ---------- AI UI ---------- */
+function renderProvSelect(){
+  const ps=document.getElementById('provSelect'); ps.innerHTML='';
+  PROVIDERS.forEach(p=>{
+    const o=document.createElement('option'); o.value=p.id;
+    o.textContent=p.name+(cfg[p.id].key?' ✓':' (키없음)');
+    if(p.id===active.pid) o.selected=true; ps.appendChild(o);
+  });
+  renderModelSelect();
+}
+function renderModelSelect(){
+  const ms=document.getElementById('modelSelect'); ms.innerHTML='';
+  PROV[active.pid].models.forEach(m=>{
+    const o=document.createElement('option'); o.value=m.id; o.textContent=m.id;
+    if(m.id===active.model) o.selected=true; ms.appendChild(o);
+  });
+  updateAIStatus();
+}
+function onProvChange(){
+  active.pid=document.getElementById('provSelect').value;
+  active.model=PROV[active.pid].models[0].id;
+  glob.currentProv=active.pid; glob.currentModel=active.model; save(LS.glob,glob);
+  renderModelSelect();
+}
+function onModelChange(){
+  active.model=document.getElementById('modelSelect').value;
+  glob.currentModel=active.model; save(LS.glob,glob); updateAIStatus();
+}
+function toggleAuto(){ glob.autoMode=document.getElementById('autoMode').checked; save(LS.glob,glob); }
+function autoOrder(){
+  // providers with a key and priority>0, sorted by ascending priority
+  return PROVIDERS
+    .filter(p=>cfg[p.id].key && (cfg[p.id].priority||0)>0)
+    .sort((a,b)=>cfg[a.id].priority-cfg[b.id].priority)
+    .map(p=>({pid:p.id, model:cfg[p.id].model}));
+}
+function pickAuto(){
+  const o=autoOrder(); return o.length?o[0]:null;
+}
+function updateAIStatus(){
+  const el=document.getElementById('sb-ai');
+  if(el) el.textContent='AI: '+PROV[active.pid].name+(glob.autoMode?' (자동)':'');
+  const ip=document.getElementById('inlineAIProv');
+  if(ip) ip.textContent='· '+PROV[active.pid].name+(glob.autoMode?' (자동)':'');
+}
+
+function autoGrow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,window.innerHeight*0.3)+'px'; }
+
+// store of code blocks so copy/insert never break on quotes/special chars
+const _codeBlocks=[];
+function renderMessage(m, targetLogId){
+  const log=document.getElementById(targetLogId||'chatLog');
+  const d=document.createElement('div'); d.className='msg '+m.role;
+  let html='';
+  if(m.role==='assistant') html+=`<div class="who">${esc(PROV[m.prov]?PROV[m.prov].name:'AI')} · ${esc(m.model||'')}</div>`;
+  html+=renderMarkdown(m.text);
+  d.innerHTML=html;
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+}
+function renderMarkdown(text){
+  const parts=String(text).split(/```/);
+  let out='';
+  parts.forEach((seg,i)=>{
+    if(i%2===1){
+      const firstNL=seg.indexOf('\n');
+      const body=firstNL>=0?seg.slice(firstNL+1):seg;
+      const idx=_codeBlocks.push(body)-1;   // store, reference by index
+      out+=`<pre><code>${esc(body)}</code></pre>`+
+           `<div class="codebar">`+
+           `<button data-copy="${idx}">복사</button>`+
+           `<button data-insert="${idx}">삽입</button>`+
+           `<button data-replace="${idx}">삭제붙임</button></div>`;
+    }else{
+      out+=esc(seg).replace(/\n/g,'<br>');
+    }
+  });
+  return out;
+}
+// event delegation: robust copy/insert in any chat log
+document.addEventListener('click',function(e){
+  const t=e.target;
+  if(t && t.dataset){
+    if(t.dataset.copy!==undefined){ copyText(_codeBlocks[+t.dataset.copy]); }
+    else if(t.dataset.insert!==undefined){ insertCode(_codeBlocks[+t.dataset.insert]); }
+    else if(t.dataset.replace!==undefined){ replaceAllCode(_codeBlocks[+t.dataset.replace]); }
+  }
+});
+function replaceAllCode(t){
+  t=String(t);
+  _undoBackup=getCode();          // allow undo
+  setCode(t); onCode(); switchView('editor');
+  toast('ok','삭제 후 붙임','에디터 내용을 새 코드로 교체했습니다.');
+}
+function copyText(t){
+  t=String(t);
+  const done=()=>toast('ok','복사됨','클립보드에 복사했습니다.');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done,()=>fallbackCopy(t,done));
+  }else fallbackCopy(t,done);
+}
+function insertCode(t){
+  t=String(t);
+  if(cmEditor){
+    cmEditor.getDoc().replaceSelection(t);
+  }else{
+    const c=codeEl(); const s=c.selectionStart;
+    c.value=c.value.slice(0,s)+t+c.value.slice(c.selectionEnd);
+  }
+  onCode(); switchView('editor');
+  toast('ok','삽입됨','코드가 에디터에 삽입되었습니다.');
+}
+
+/* ============================================================
+   AI CODE EDITING (Cursor-like): diff review + apply
+   ============================================================ */
+let _pendingCode=null;     // proposed full new code awaiting accept
+let _undoBackup=null;      // previous code, for one-step undo after apply
+
+// Parse AI reply for edits. Supports two formats:
+//  (A) SEARCH/REPLACE blocks for partial edits:
+//        <<<<<<< SEARCH \n ...old... \n ======= \n ...new... \n >>>>>>> REPLACE
+//  (B) a single fenced code block = full-file replacement
+function extractProposedCode(aiText, currentCode){
+  // (A) search/replace
+  const blocks=[...aiText.matchAll(/<<<<<<<\s*SEARCH\s*\n([\s\S]*?)\n=======\s*\n([\s\S]*?)\n>>>>>>>\s*REPLACE/g)];
+  if(blocks.length){
+    let code=currentCode, applied=0, failed=0;
+    for(const b of blocks){
+      const oldS=b[1], newS=b[2];
+      if(code.indexOf(oldS)>=0){ code=code.replace(oldS,newS); applied++; }
+      else failed++;
+    }
+    if(applied>0) return {code, mode:'partial', applied, failed};
+  }
+  // (B) full code block
+  const fence=aiText.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+  if(fence) return {code:fence[1].replace(/\n$/,''), mode:'full', applied:1, failed:0};
+  return null;
+}
+
+function renderDiff(oldCode, newCode){
+  const body=document.getElementById('diffBody'); body.innerHTML='';
+  const D=(typeof Diff!=='undefined')?Diff:(window.Diff||null);
+  if(!D || !D.diffLines){
+    // fallback: show old (red) then new (green) without fine-grained diff
+    const mk=(txt,cls,pfx)=>txt.split('\n').forEach(ln=>{
+      const d=document.createElement('div'); d.className='dl '+cls; d.textContent=pfx+ln; body.appendChild(d);});
+    const h=document.createElement('div'); h.className='dl ctx'; h.textContent='— 이전 —'; body.appendChild(h);
+    mk(oldCode,'del','- ');
+    const h2=document.createElement('div'); h2.className='dl ctx'; h2.textContent='— 이후 —'; body.appendChild(h2);
+    mk(newCode,'add','+ ');
+    return;
+  }
+  const parts=D.diffLines(oldCode, newCode);
+  parts.forEach(p=>{
+    const cls=p.added?'add':(p.removed?'del':'ctx');
+    const prefix=p.added?'+ ':(p.removed?'- ':'  ');
+    p.value.replace(/\n$/,'').split('\n').forEach(ln=>{
+      const d=document.createElement('div'); d.className='dl '+cls;
+      d.textContent=prefix+ln; body.appendChild(d);
+    });
+  });
+}
+
+function reviewAIEdit(aiText){
+  const cur=getCode();
+  const prop=extractProposedCode(aiText, cur);
+  if(!prop){ toast('warn','적용할 코드 없음','AI 응답에 코드 블록이 없습니다.'); return false; }
+  _pendingCode=prop.code;
+  document.getElementById('diffTitle').textContent =
+    prop.mode==='partial'
+      ? `부분 수정 검토 (적용 ${prop.applied}${prop.failed?(', 실패 '+prop.failed):''})`
+      : '전체 변경 검토';
+  renderDiff(cur, prop.code);
+  document.getElementById('diffModal').classList.remove('hidden');
+  return true;
+}
+function diffAccept(){
+  if(_pendingCode!=null){
+    _undoBackup=getCode();
+    setCode(_pendingCode); onCode();
+    toast('ok','적용됨','AI 수정을 적용했습니다. (실행취소: Ctrl+Z / 메뉴)');
+  }
+  _pendingCode=null;
+  document.getElementById('diffModal').classList.add('hidden');
+  switchView('editor');
+}
+function diffCancel(){
+  _pendingCode=null;
+  document.getElementById('diffModal').classList.add('hidden');
+}
+function undoAIEdit(){
+  if(_undoBackup!=null){ const cur=getCode(); setCode(_undoBackup); _undoBackup=cur; onCode();
+    toast('ok','되돌림','이전 코드로 복구했습니다.'); }
+}
+
+// Ask AI to FIX the current code; instructs it to return an editable result.
+function aiFixCode(){
+  openInlineAI();
+  const inp=document.getElementById('inlineInput');
+  inp.value='';
+  inp.placeholder='어떻게 고칠까요? (예: 버그 수정, 함수로 리팩터링) — 비워두면 전반적으로 개선';
+  inp.dataset.fixMode='1';
+  inp.focus();
+}
+
+// Unified chat sender used by both the AI tab and the inline editor AI.
+// opts: {inputEl, logId, sendBtnId, stopBtnId, extraContext}
+async function runChat(opts){
+  const inp=document.getElementById(opts.inputEl);
+  let text=inp.value.trim();
+  if(!text && opts.editMode) text='이 코드를 전반적으로 개선하고 버그가 있으면 고쳐줘.';
+  if(!text) return;
+  // build the provider attempt order
+  let order;
+  if(glob.autoMode){
+    order=autoOrder();
+    if(!order.length){ toast('bad','키 없음','자동 모드: 우선순위>0 이고 키가 있는 LLM이 없습니다.'); switchView('settings'); return; }
+  }else{
+    if(!cfg[active.pid].key){ toast('bad','키 없음',PROV[active.pid].name+' 키를 입력하세요.'); switchView('settings'); return; }
+    order=[{pid:active.pid, model:active.model}];
+  }
+
+  // compose user message, optionally with attached editor code
+  let fullText=text;
+  if(opts.extraContext){ fullText=text+'\n\n```python\n'+opts.extraContext+'\n```'; }
+  // optional one-shot system instruction (e.g. from aiFixCode)
+  const sysInstr = inp.dataset.sysInstr || '';
+  if(sysInstr){ fullText = sysInstr + '\n\n---\n' + fullText; delete inp.dataset.sysInstr; }
+  const wantEdit = !!opts.editMode || !!sysInstr;
+  const um={role:'user',text:fullText}; chat.push(um);
+  renderMessage({role:'user',text}, opts.logId);
+  inp.value=''; autoGrow(inp);
+
+  const logEl=document.getElementById(opts.logId);
+  const ph=document.createElement('div'); ph.className='msg assistant';
+  ph.innerHTML='<div class="typing">응답 생성 중…</div>';
+  logEl.appendChild(ph); logEl.scrollTop=logEl.scrollHeight;
+
+  const sendBtn=document.getElementById(opts.sendBtnId);
+  const stopBtn=opts.stopBtnId?document.getElementById(opts.stopBtnId):null;
+  if(sendBtn) sendBtn.classList.add('hidden');
+  if(stopBtn) stopBtn.classList.remove('hidden');
+
+  const ctx=chat.map(m=>({role:m.role,text:m.text}));
+  let done=false, lastErr=null;
+  for(let i=0;i<order.length;i++){
+    const {pid,model}=order[i];
+    active.pid=pid; active.model=model; updateAIStatus(); renderProvSelect();
+    ph.querySelector('.typing').textContent=
+      `${PROV[pid].name} 응답 생성 중…`+(order.length>1?` (${i+1}/${order.length})`:'');
+    try{
+      const out=await callProvider(pid, model, ctx);
+      ph.remove();
+      const am={role:'assistant',text:out,prov:pid,model};
+      chat.push(am); renderMessage(am, opts.logId);
+      // Cursor-like: if the reply contains code edits, offer a diff review
+      if(wantEdit || /<<<<<<< SEARCH/.test(out)){
+        setTimeout(()=>reviewAIEdit(out), 200);
+      }
+      done=true; break;
+    }catch(err){
+      lastErr=err;
+      if(err.kind==='abort'){ ph.remove(); log('warn','AI 응답을 중단했습니다.'); done=true; break; }
+      // on rate-limit/token exhaustion in auto mode, fall through to next
+      if(glob.autoMode && (err.kind==='limit'||err.kind==='http')){
+        log('warn',`[${PROV[pid].name}] 실패(${err.kind}) → 다음 LLM 시도`);
+        continue;
+      }
+      break;
+    }
+  }
+  if(!done){
+    ph.remove();
+    toast('bad','AI 실패',(lastErr&&(lastErr.msg||String(lastErr))||'알 수 없는 오류').slice(0,140));
+    log('err','AI 오류: '+(lastErr&&(lastErr.msg||lastErr)));
+  }
+  _abortCtrl=null;
+  if(sendBtn) sendBtn.classList.remove('hidden');
+  if(stopBtn) stopBtn.classList.add('hidden');
+}
+
+function sendChat(){
+  runChat({inputEl:'chatInput', logId:'chatLog', sendBtnId:'sendBtn', stopBtnId:'chatStopBtn'});
+}
+
+/* ---------- inline AI (editor center 'AI' button) ----------
+   Temporarily replaces the console with a chat box. Each question is sent
+   WITH the current editor content as context. Run or ✕ closes it. */
+function toggleInlineAI(){
+  const box=document.getElementById('inlineAI');
+  if(box.classList.contains('hidden')) openInlineAI();
+  else closeInlineAI();
+}
+function openInlineAI(){
+  document.getElementById('inlineAI').classList.remove('hidden');
+  document.getElementById('inlineAIProv').textContent='· '+PROV[active.pid].name+(glob.autoMode?' (자동)':'');
+  document.getElementById('inlineInput').focus();
+}
+function closeInlineAI(){
+  document.getElementById('inlineAI').classList.add('hidden');
+}
+function sendInlineChat(){
+  const inp=document.getElementById('inlineInput');
+  const isFix = inp.dataset.fixMode==='1';
+  const code=getCode();   // capture current editor content NOW
+  if(isFix){
+    inp.dataset.sysInstr='You are a code-editing assistant. Modify the Python code '
+      +'below per the user request. Reply with ONE fenced code block containing the '
+      +'COMPLETE updated file, OR search/replace blocks in this exact format:\n'
+      +'<<<<<<< SEARCH\n(exact existing lines)\n=======\n(replacement lines)\n>>>>>>> REPLACE\n'
+      +'Do not add explanation outside the block(s).';
+    delete inp.dataset.fixMode;
+  }
+  runChat({inputEl:'inlineInput', logId:'inlineChatLog',
+           sendBtnId:'inlineSendBtn', stopBtnId:'inlineStopBtn',
+           extraContext:code, editMode:isFix});
+}
+
+/* AI tab: attach editor code into the input (manual button) */
+function insertEditorToChat(){
+  const inp=document.getElementById('chatInput');
+  const code=getCode();
+  const prefix=inp.value.trim()?inp.value.replace(/\s*$/,'')+'\n\n':'';
+  inp.value=prefix+'```python\n'+code+'\n```\n';
+  autoGrow(inp); inp.focus();
+  toast('ok','코드 첨부','에디터 코드를 입력창에 넣었습니다.');
+}
+
+/* ============================================================
+   SETTINGS  (font slider + clean toggles + 10 API keys)
+   ============================================================ */
+function renderSettings(){
+  const s=document.getElementById('settings');
+  s.innerHTML='';
+  // editor section
+  s.innerHTML+=`<div class="sect">에디터</div>`;
+  const fontRow=document.createElement('div'); fontRow.className='srow';
+  fontRow.innerHTML=`<label>글자 크기</label>
+    <button onclick="changeFont(-1)" style="flex:0">A−</button>
+    <input type="range" min="11" max="40" value="${glob.fontSize}" style="flex:2"
+      oninput="glob.fontSize=+this.value;applyFont()">
+    <span style="flex:0;min-width:2em;text-align:center;color:var(--accent2)" id="setFontVal">${glob.fontSize}</span>
+    <button onclick="changeFont(1)" style="flex:0">A+</button>`;
+  s.appendChild(fontRow);
+
+  s.appendChild(toggleRow('Word Wrap', glob.wrap, v=>{glob.wrap=v;if(cmEditor)cmEditor.setOption('lineWrapping',v);else codeEl().classList.toggle('wrap',v);save(LS.glob,glob);}));
+
+  // file handling (browser)
+  s.innerHTML+=`<div class="sect">파일 (브라우저)</div>`;
+  const fileInfo=document.createElement('div'); fileInfo.className='srow';
+  fileInfo.innerHTML=`<span style="font-size:.78em;color:var(--fg2);line-height:1.5">
+    • <b>Save</b>: 현재 파일을 기기로 다운로드<br>
+    • <b>열기</b>: 기기에서 파일 업로드<br>
+    • <b>결과파일</b>: 코드가 만든 CSV 등 파일을 다운로드<br>
+    • 작업은 브라우저에 자동 저장됩니다(localStorage)</span>`;
+  s.appendChild(fileInfo);
+
+  // AI auto-mode + keys
+  s.innerHTML+=`<div class="sect">AI 설정</div>`;
+  s.appendChild(toggleRow('자동 모드 (우선순위대로 자동 선택)', glob.autoMode, v=>{
+    glob.autoMode=v; save(LS.glob,glob);
+    const am=document.getElementById('autoMode'); if(am) am.checked=v;
+  }));
+  const hint=document.createElement('div'); hint.style.cssText='font-size:.74em;color:var(--fg2);padding:.2em .3em .6em';
+  hint.textContent='우선순위: 숫자가 작을수록 먼저 사용. 0을 넣으면 키가 있어도 자동 모드에서 제외됩니다. 토큰이 소진되면 다음 순위 LLM으로 자동 전환됩니다.';
+  s.appendChild(hint);
+
+  s.innerHTML+=`<div class="sect">AI API 키 (무료 10종)</div>`;
+  PROVIDERS.forEach(p=>{
+    const row=document.createElement('div'); row.className='keyrow';
+    const accInput = p.needsAccount ?
+      `<input type="text" id="acc_${p.id}" placeholder="Account ID" value="${esc(cfg[p.id].account||'')}">` : '';
+    const modelOpts = p.models.map(m=>`<option value="${esc(m.id)}" ${m.id===cfg[p.id].model?'selected':''}>${esc(m.id)}</option>`).join('');
+    row.innerHTML=`<div class="top"><span class="pname">${esc(p.name)}</span>
+        ${cfg[p.id].tested
+            ? '<span class="lim" style="color:var(--ok)">● 검증됨</span>'
+            : (cfg[p.id].key
+                ? '<span class="lim" style="color:var(--warn)">● 키 있음(미검증)</span>'
+                : '<span class="lim" style="color:var(--fg2)">○ 키 없음</span>')}
+        <a href="${p.keyUrl}" target="_blank">발급 ↗</a></div>
+      <input type="password" id="key_${p.id}" placeholder="API Key" value="${esc(cfg[p.id].key||'')}">
+      ${accInput}
+      <div class="row" style="gap:.4em;margin-top:.3em">
+        <select id="model_${p.id}" style="flex:2">${modelOpts}</select>
+        <input type="number" id="prio_${p.id}" min="0" max="99" value="${cfg[p.id].priority||0}"
+          title="자동 우선순위 (0=제외)" style="flex:0;width:3.2em;text-align:center" placeholder="순위">
+      </div>
+      <div class="row" style="gap:.4em;margin-top:.3em">
+        <button class="btn-primary" onclick="saveKey('${p.id}')" style="flex:1">저장</button>
+        <button onclick="testKey('${p.id}')" style="flex:1">테스트</button>
+      </div>`;
+    s.appendChild(row);
+  });
+
+  s.innerHTML+=`<div class="sect">정보</div>`;
+  const about=document.createElement('div'); about.className='srow';
+  about.innerHTML=`<label>MyVscode</label><span style="color:var(--fg2);font-size:.8em">iPad v1.0.0 · 영찬영하 Daddy</span>`;
+  s.appendChild(about);
+}
+function saveKey(pid){
+  const k=document.getElementById('key_'+pid);
+  if(k){ if(k.value.trim()!==cfg[pid].key){ cfg[pid].tested=false; } cfg[pid].key=k.value.trim(); }
+  const a=document.getElementById('acc_'+pid);
+  if(a) cfg[pid].account=a.value.trim();
+  const m=document.getElementById('model_'+pid);
+  if(m) cfg[pid].model=m.value;
+  const pr=document.getElementById('prio_'+pid);
+  if(pr) cfg[pid].priority=Math.max(0,Math.min(99,parseInt(pr.value||'0',10)));
+  saveCfg(); renderProvSelect();
+  toast('ok','저장됨', PROV[pid].name+(cfg[pid].key?(' · 우선순위 '+cfg[pid].priority):' (키 비어있음)'));
+}
+async function testKey(pid){
+  saveKey(pid); // save first so the test uses the latest value
+  if(!cfg[pid].key){ toast('bad','키 없음', PROV[pid].name+' 키를 입력하세요.'); return; }
+  if(PROV[pid].needsAccount && !cfg[pid].account){ toast('bad','Account 필요', PROV[pid].name); return; }
+  toast('warn','테스트 중…', PROV[pid].name+' 호출 확인 중');
+  try{
+    const model=cfg[pid].model||PROV[pid].models[0].id;
+    const out=await callProvider(pid, model, [{role:'user', text:'Say OK'}]);
+    cfg[pid].tested=true; saveCfg();           // mark verified
+    toast('ok', PROV[pid].name+' 연결 성공', (out||'').slice(0,40) || '응답 수신');
+    log('ok','['+PROV[pid].name+'] 테스트 성공: '+(out||'').slice(0,60));
+    renderSettings();                          // refresh "verified" badge
+  }catch(err){
+    cfg[pid].tested=false; saveCfg();
+    toast('bad', PROV[pid].name+' 실패', (err.msg||String(err)).slice(0,120));
+    log('err','['+PROV[pid].name+'] 테스트 실패: '+(err.msg||err));
+    renderSettings();
+  }
+}
+function toggleRow(label, val, onChange){
+  const r=document.createElement('div'); r.className='srow';
+  const id='tg_'+Math.random().toString(36).slice(2);
+  r.innerHTML=`<label>${esc(label)}</label>
+    <span class="toggle"><input type="checkbox" id="${id}" ${val?'checked':''}>
+    <span class="track"></span><span class="knob"></span></span>`;
+  r.querySelector('input').addEventListener('change',e=>onChange(e.target.checked));
+  return r;
+}
+
+/* ============================================================
+   VIEW SWITCH + utils
+   ============================================================ */
+function switchView(v){
+  ['editor','ai','settings'].forEach(name=>{
+    document.getElementById('p-'+name).classList.toggle('hidden', name!==v);
+  });
+  document.querySelectorAll('#views .vbtn').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
+  document.getElementById('sb-mode').textContent=v.charAt(0).toUpperCase()+v.slice(1);
+  if(v==='ai'){
+    renderProvSelect();
+    const am=document.getElementById('autoMode'); if(am) am.checked=glob.autoMode;
+    updateAIStatus();
+  }
+  if(v==='settings') renderSettings();
+}
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(kind, title, body){
+  const t=document.getElementById('toast');
+  const d=document.createElement('div'); d.className='tmsg '+(kind||'');
+  d.innerHTML=`<b>${esc(title)}</b>${body?'<br>'+esc(body):''}`;
+  t.appendChild(d); setTimeout(()=>d.remove(),3200);
+}
+window.toast=toast;
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('DOMContentLoaded',()=>{
+  // put content into the textarea FIRST, then upgrade it to CodeMirror
+  codeEl().value=files[activeFile];
+  initEditor();                       // becomes CodeMirror if available
+  if(glob.wrap){
+    const b=document.getElementById('wrapBtn'); if(b) b.textContent='Wrap: ON';
+    if(!cmEditor) codeEl().classList.add('wrap');
+  }
+  renderTabs(); applyFont(); updateCursor();
+  if(!cmEditor){ syncGutter(); setupPinch(); setupEditorKeys(); }
+  updateAIStatus();
+  // Ctrl+Enter (or Cmd+Enter) sends in both chat inputs
+  const ci=document.getElementById('chatInput');
+  if(ci) ci.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); sendChat(); }
+  });
+  const ii=document.getElementById('inlineInput');
+  if(ii) ii.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); sendInlineChat(); }
+  });
+  log('sys','MyVscode (iPad) v1.0.0 준비 완료. A−/A+로 글자 크기를 조절하세요.');
+  if(cmEditor) log('sys','코드 에디터(문법 강조·자동 들여쓰기) 활성화됨.');
+  log('sys','Run을 누르면 브라우저 내 Python(Pyodide)으로 실행됩니다. 첫 실행은 로딩에 시간이 걸립니다.');
+  log('sys','numpy / pandas 는 import 시 자동으로 불러옵니다.');
+});
+
+</script>
+</body>
+</html>
